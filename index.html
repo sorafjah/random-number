@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ランダム数字ジェネレーター</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js CDN (効果音生成用) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Interフォントの読み込み */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            /* トランジション（背景色変更） */
+            transition: background-color 0.3s ease-in-out;
+            /* ページ切り替えのため */
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* 動作中のスタイル (メインページ表示時) */
+        body.running {
+            @apply bg-yellow-100;
+        }
+        
+        /* 減速中のスタイル (メインページ表示時) */
+        body.decelerating {
+            @apply bg-orange-100;
+        }
+
+        /* 画面コンテナ */
+        .page {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        /* 画面の非表示・表示 */
+        #settings-page {
+            transform: translateX(0);
+        }
+        #main-page {
+            transform: translateX(100%);
+        }
+
+        body.show-main #settings-page {
+            transform: translateX(-100%);
+        }
+        body.show-main #main-page {
+            transform: translateX(0);
+        }
+
+        /* メインページのレイアウト */
+        #main-page .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* 数字表示エリア */
+        #randomNumber {
+            font-size: clamp(4rem, 25vw, 16rem); /* 画面幅に応じてサイズ変更 */
+            font-weight: 900;
+            line-height: 1;
+            text-align: center;
+            color: #2563EB; /* text-blue-600 */
+            margin-bottom: 2rem;
+            user-select: none; /* テキスト選択不可に */
+            flex-grow: 1;
+            display: grid;
+            place-items: center;
+        }
+        
+        /* エラーメッセージ */
+        #errorMessage {
+            display: none;
+            @apply text-red-600 bg-red-100 p-3 rounded-lg border border-red-300 mb-4;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-full">
+
+    <!-- ===== 設定ページ ===== -->
+    <div id="settings-page" class="page">
+        <div class="bg-white w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-100 overflow-y-auto" style="max-height: 95vh;">
+            
+            <legend class="text-xl font-bold mb-5 text-gray-700">設定</legend>
+            
+            <!-- エラーメッセージ -->
+            <div id="errorMessage"></div>
+            
+            <fieldset id="settings" class="space-y-4">
+                
+                <!-- 範囲設定 -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="minInput" class="block text-sm font-medium text-gray-600 mb-1">最小値</label>
+                        <input type="number" id="minInput" value="1" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                    <div>
+                        <label for="maxInput" class="block text-sm font-medium text-gray-600 mb-1">最大値</label>
+                        <input type="number" id="maxInput" value="100" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                </div>
+
+                <!-- 刻み値（ステップ） -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-2">刻み値 (ずつ)</label>
+                    <select id="stepSelect" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="1">フリー (1ずつ)</option>
+                        <option value="5">5ずつ</option>
+                        <option value="10">10ずつ</option>
+                        <option value="50">50ずつ</option>
+                        <option value="100">100ずつ</option>
+                    </select>
+                </div>
+
+                <!-- 停止条件 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-2">停止条件</label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center p-3 border border-gray-300 rounded-lg flex-1 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400 transition">
+                            <input type="radio" id="stopModeTimer" name="stopMode" value="timer" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                            <span class="ml-3 text-gray-700">タイマー</span>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-300 rounded-lg flex-1 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400 transition">
+                            <input type="radio" id="stopModeManual" name="stopMode" value="manual" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                            <span class="ml-3 text-gray-700">手動ボタン</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- タイマー入力 -->
+                <div id="timerInputContainer">
+                    <label for="timerInput" class="block text-sm font-medium text-gray-600 mb-1">停止までの時間 (秒)</label>
+                    <input type="number" id="timerInput" value="5" min="1" step="0.1" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+            </fieldset>
+            
+            <!-- 設定完了ボタン -->
+            <button id="configCompleteButton" class="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg hover:bg-green-700 active:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all transform active:scale-95 mt-6">
+                設定完了
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== メインページ（動作画面） ===== -->
+    <div id="main-page" class="page">
+        <div class="content-wrapper">
+            <!-- 1. メイン数字表示 -->
+            <div id="randomNumber">1</div>
+
+            <!-- 2. 操作ボタン -->
+            <div class="flex flex-col items-center space-y-4 w-full max-w-md p-4">
+                <!-- スタートボタン (幅と色を変更) -->
+                <button id="startButton" class="bg-green-500 text-white font-bold py-4 px-8 rounded-lg shadow-lg hover:bg-green-600 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all transform active:scale-95">
+                    スタート
+                </button>
+                <!-- ストップボタン (幅を変更) -->
+                <button id="stopButton" class="bg-orange-500 text-white font-bold py-4 px-8 rounded-lg shadow-lg hover:bg-orange-600 active:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all transform active:scale-95">
+                    ストップ
+                </button>
+                <!-- 設定に戻るボタン (テキストリンクに変更) -->
+                <a href="#" id="backToSettingsLink" class="text-gray-600 hover:text-gray-800 hover:underline pt-4 text-sm">
+                    設定に戻る
+                </a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 4. JavaScript ロジック (エラー修正版) -->
+    <script type="module">
+        // --- DOM要素の取得 ---
+        const settingsPage = document.getElementById('settings-page');
+        const mainPage = document.getElementById('main-page');
+        const randomNumberEl = document.getElementById('randomNumber');
+        const minInput = document.getElementById('minInput');
+        const maxInput = document.getElementById('maxInput');
+        const stepSelect = document.getElementById('stepSelect');
+        const timerInput = document.getElementById('timerInput');
+        const timerInputContainer = document.getElementById('timerInputContainer');
+        const configCompleteButton = document.getElementById('configCompleteButton'); // 名前変更
+        const startButton = document.getElementById('startButton'); // メインページのスタート
+        const stopButton = document.getElementById('stopButton');
+        const backToSettingsLink = document.getElementById('backToSettingsLink'); // 名前変更
+        const stopModeTimerRadio = document.getElementById('stopModeTimer');
+        const stopModeManualRadio = document.getElementById('stopModeManual');
+        const errorMessageEl = document.getElementById('errorMessage');
+
+        // --- 状態変数 ---
+        let isRunning = false;
+        let animationInterval = null;
+        let decelerationTimeout = null;
+        let stopTimerTimeout = null;
+        let currentMin = 1;
+        let currentMax = 100;
+        let currentStep = 1;
+        let finalNumber = 1;
+
+        // --- 効果音のセットアップ (Tone.js) ---
+        
+        // 1. 高速切り替え音（ピッピッピ） - Sine波に変更
+        const tickSynth = new Tone.Synth({
+            oscillator: { 
+                type: 'sine' // 'pulse'から'sine'(サイン波)に戻す
+            }, 
+            envelope: { attack: 0.001, decay: 0.01, sustain: 0, release: 0.01 } // 短く切る
+        }).toDestination();
+        // 音量を調整
+        tickSynth.volume.value = -10; // -10dB
+
+        // 2. 減速音（ポ）
+        const decelerateSynth = new Tone.Synth({
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 }
+        }).toDestination();
+        
+        // 3. 決定音（チーン）- FMSynth に変更
+        const finalSynth = new Tone.FMSynth({
+            harmonicity: 3, // 倍音の比率
+            modulationIndex: 10,
+            envelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 0.2 }, // decayを1秒に
+            modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 }
+        }).toDestination();
+        // 音量を調整
+        finalSynth.volume.value = -6; // -6dB
+
+
+        // --- 初期設定 ---
+        minInput.addEventListener('input', () => {
+             // 設定画面の初期値を最小値に連動させる
+             if (!isRunning) {
+                 randomNumberEl.textContent = minInput.value || '1';
+             }
+        });
+
+        // --- 関数 ---
+
+        /**
+         * エラーメッセージを表示
+         */
+        function showError(message) {
+            errorMessageEl.textContent = message;
+            errorMessageEl.style.display = 'block';
+        }
+        /**
+         * エラーメッセージを非表示
+         */
+        function hideError() {
+            errorMessageEl.style.display = 'none';
+        }
+
+        /**
+         * 範囲内のランダムな整数を生成 (刻み値対応)
+         */
+        function getRandomNumber(min, max, step) {
+            const adjustedMin = Math.ceil(min / step) * step;
+            const adjustedMax = Math.floor(max / step) * step;
+            
+            // 生成可能な数字が存在するかチェック
+            if (adjustedMin > adjustedMax) {
+                return min; // フェイルセーフ
+            }
+            
+            const steps = (adjustedMax - adjustedMin) / step;
+            const randomStep = Math.floor(Math.random() * (steps + 1));
+            return adjustedMin + (randomStep * step);
+        }
+
+        /**
+         * 4. UIの状態を更新 (ボタン表示/非表示を制御)
+         */
+        function updateUIState(state) {
+            isRunning = (state === 'running');
+            
+            document.body.classList.toggle('running', state === 'running');
+            document.body.classList.toggle('decelerating', state === 'decelerating');
+            
+            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
+
+            if (state === 'stopped') {
+                startButton.style.display = 'block';
+                stopButton.style.display = 'none';
+                backToSettingsLink.style.display = 'block';
+            } else if (state === 'running') {
+                startButton.style.display = 'none';
+                stopButton.style.display = 'block';
+                backToSettingsLink.style.display = 'none';
+                
+                stopButton.disabled = (stopMode === 'timer');
+            } else if (state === 'decelerating') {
+                startButton.style.display = 'none';
+                stopButton.style.display = 'none';
+                backToSettingsLink.style.display = 'none';
+                stopButton.disabled = true;
+            }
+        }
+
+        /**
+         * 高速ランダムアニメーションを開始
+         */
+        function startFastAnimation() {
+            animationInterval = setInterval(() => {
+                randomNumberEl.textContent = getRandomNumber(currentMin, currentMax, currentStep);
+                // 明るい音を再生 (周波数をA6に変更)
+                tickSynth.triggerAttackRelease('A6', '0.01');
+            }, 50); // 間隔を 30ms から 50ms に変更（「ピピピ」感を出すため）
+        }
+
+        /**
+         * 最終的な数字を決定し、表示
+         */
+        function finalizeNumber() {
+            clearTimeout(decelerationTimeout);
+            randomNumberEl.textContent = finalNumber;
+            
+            // 決定音（チーン）- 周波数をC5、長さを1.5秒に変更
+            finalSynth.triggerAttackRelease("C5", "1.5", Tone.now() + 0.1);
+
+            // UIを停止状態に戻す
+            updateUIState('stopped');
+        }
+
+        /**
+         * 減速演出 (時間を約2倍に)
+         */
+        function decelerate(step = 0) {
+            const delays = [160, 240, 360, 500, 700, 1000]; 
+
+            if (step >= delays.length) {
+                // 減速完了
+                finalizeNumber();
+                return;
+            }
+
+            // 減速音
+            decelerateSynth.triggerAttackRelease('C4', '0.05');
+
+            // ダミーの数字を表示 (刻み値考慮)
+            randomNumberEl.textContent = getRandomNumber(currentMin, currentMax, currentStep);
+
+            // 次のステップを予約
+            decelerationTimeout = setTimeout(() => {
+                decelerate(step + 1);
+            }, delays[step]);
+        }
+
+        /**
+         * 停止と減速の処理を開始
+         */
+        function initiateDeceleration() {
+            if (!isRunning) return; 
+
+            // 高速アニメーションと自動停止タイマーを停止
+            clearInterval(animationInterval);
+            clearTimeout(stopTimerTimeout);
+            
+            updateUIState('decelerating');
+
+            // 最終的な数字を決定 (刻み値考慮)
+            finalNumber = getRandomNumber(currentMin, currentMax, currentStep);
+
+            // 減速演出を開始
+            decelerate();
+        }
+
+        /**
+         * 5. 設定完了ボタンの処理 (フロー変更)
+         */
+        async function handleConfigComplete() {
+            // ユーザー操作によるオーディオコンテキストの開始 (初回のみ)
+            await Tone.start();
+            hideError();
+
+            // 設定値の取得とバリデーション
+            currentMin = parseInt(minInput.value);
+            currentMax = parseInt(maxInput.value);
+            currentStep = parseInt(stepSelect.value);
+
+            // バリデーション
+            if (isNaN(currentMin) || isNaN(currentMax)) {
+                showError('最小値または最大値が無効です。');
+                return;
+            }
+            if (currentMin > currentMax) {
+                showError('最小値は最大値より小さくしてください。');
+                return;
+            }
+            
+            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
+            const duration = parseFloat(timerInput.value) * 1000;
+            if (stopMode === 'timer' && (isNaN(duration) || duration <= 0)) {
+                showError('タイマーの時間が無効です。');
+                return;
+            }
+            
+            // 刻み値のバリデーション
+            const adjustedMin = Math.ceil(currentMin / currentStep) * currentStep;
+            const adjustedMax = Math.floor(currentMax / currentStep) * currentStep;
+            if (adjustedMin > adjustedMax) {
+                showError(`その範囲（${currentMin}〜${currentMax}）では「${currentStep}ずつ」の数字を生成できません。`);
+                return;
+            }
+
+            // --- 起動処理 ---
+            // 画面遷移
+            document.body.classList.add('show-main');
+            // メインページのUIを初期状態（停止状態）に設定
+            updateUIState('stopped');
+            // 表示を最小値にリセット
+            randomNumberEl.textContent = currentMin;
+        }
+        
+        /**
+         * 6. メインスタートボタンの処理 (新規)
+         */
+        async function handleMainStart() {
+            // 念のためオーディオコンテキスト開始
+            await Tone.start();
+
+            // UIを動作中状態に更新
+            updateUIState('running');
+            
+            // 高速アニメーション開始
+            startFastAnimation();
+
+            // 停止条件に応じた処理
+            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
+            const duration = parseFloat(timerInput.value) * 1000;
+
+            if (stopMode === 'timer') {
+                stopTimerTimeout = setTimeout(initiateDeceleration, duration);
+            }
+        }
+
+
+        /**
+         * ストップボタンの処理
+         */
+        function handleStop() {
+            stopButton.disabled = true; // 連打防止
+            initiateDeceleration();
+        }
+
+        /**
+         * 7. 設定に戻るリンクの処理 (変更)
+         */
+        function handleBackToSettings(e) {
+            e.preventDefault(); // リンクのデフォルト動作をキャンセル
+
+            // 動作中なら強制停止（完了を待たずに即時停止）
+            if (isRunning || document.body.classList.contains('decelerating')) {
+                clearInterval(animationInterval);
+                clearTimeout(decelerationTimeout);
+                clearTimeout(stopTimerTimeout);
+            }
+            // 画面遷移
+            document.body.classList.remove('show-main');
+            // 状態リセット
+            document.body.classList.remove('running', 'decelerating');
+            // 初期値を表示
+            randomNumberEl.textContent = minInput.value || '1';
+            // メインページのボタン状態をリセット
+            updateUIState('stopped'); 
+        }
+
+        /**
+         * 停止モードの変更処理
+         */
+        function handleStopModeChange() {
+            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
+            timerInputContainer.style.display = (stopMode === 'timer') ? 'block' : 'none';
+        }
+
+        // --- イベントリスナーの設定 ---
+        configCompleteButton.addEventListener('click', handleConfigComplete); // 変更
+        startButton.addEventListener('click', handleMainStart); // 追加
+        stopButton.addEventListener('click', handleStop);
+        backToSettingsLink.addEventListener('click', handleBackToSettings); // 変更
+        stopModeTimerRadio.addEventListener('change', handleStopModeChange);
+        stopModeManualRadio.addEventListener('change', handleStopModeChange);
+
+        // --- 初期化処理 ---
+        handleStopModeChange(); // タイマー入力欄の表示を制御
+        randomNumberEl.textContent = minInput.value; // 初期値を表示
+        updateUIState('stopped'); // 初期ボタン状態を設定
+
+    </script>
+</body>
+</html>
+
