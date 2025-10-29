@@ -126,26 +126,8 @@
                     </select>
                 </div>
 
-                <!-- 停止条件 -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-2">停止条件</label>
-                    <div class="flex space-x-4">
-                        <label class="flex items-center p-3 border border-gray-300 rounded-lg flex-1 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400 transition">
-                            <input type="radio" id="stopModeTimer" name="stopMode" value="timer" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
-                            <span class="ml-3 text-gray-700">タイマー</span>
-                        </label>
-                        <label class="flex items-center p-3 border border-gray-300 rounded-lg flex-1 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400 transition">
-                            <input type="radio" id="stopModeManual" name="stopMode" value="manual" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
-                            <span class="ml-3 text-gray-700">手動ボタン</span>
-                        </label>
-                    </div>
-                </div>
+                <!-- 停止条件とタイマー入力のUIを削除 -->
 
-                <!-- タイマー入力 -->
-                <div id="timerInputContainer">
-                    <label for="timerInput" class="block text-sm font-medium text-gray-600 mb-1">停止までの時間 (秒)</label>
-                    <input type="number" id="timerInput" value="5" min="1" step="0.1" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                </div>
             </fieldset>
             
             <!-- 設定完了ボタン -->
@@ -189,21 +171,18 @@
         const minInput = document.getElementById('minInput');
         const maxInput = document.getElementById('maxInput');
         const stepSelect = document.getElementById('stepSelect');
-        const timerInput = document.getElementById('timerInput');
-        const timerInputContainer = document.getElementById('timerInputContainer');
-        const configCompleteButton = document.getElementById('configCompleteButton'); // 名前変更
-        const startButton = document.getElementById('startButton'); // メインページのスタート
+        // タイマーと停止モード関連のDOM取得を削除
+        const configCompleteButton = document.getElementById('configCompleteButton'); 
+        const startButton = document.getElementById('startButton'); 
         const stopButton = document.getElementById('stopButton');
-        const backToSettingsLink = document.getElementById('backToSettingsLink'); // 名前変更
-        const stopModeTimerRadio = document.getElementById('stopModeTimer');
-        const stopModeManualRadio = document.getElementById('stopModeManual');
+        const backToSettingsLink = document.getElementById('backToSettingsLink'); 
         const errorMessageEl = document.getElementById('errorMessage');
 
         // --- 状態変数 ---
         let isRunning = false;
         let animationInterval = null;
         let decelerationTimeout = null;
-        let stopTimerTimeout = null;
+        // stopTimerTimeout を削除
         let currentMin = 1;
         let currentMax = 100;
         let currentStep = 1;
@@ -211,12 +190,12 @@
 
         // --- 効果音のセットアップ (Tone.js) ---
         
-        // 1. 高速切り替え音（ピッピッピ） - Sine波に変更
+        // 1. 高速切り替え音（ピッピッピ） - Sine波、Decay調整
         const tickSynth = new Tone.Synth({
             oscillator: { 
                 type: 'sine' // 'pulse'から'sine'(サイン波)に戻す
             }, 
-            envelope: { attack: 0.001, decay: 0.01, sustain: 0, release: 0.01 } // 短く切る
+            envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 } // decayを 0.01 -> 0.02 に少し伸ばす
         }).toDestination();
         // 音量を調整
         tickSynth.volume.value = -10; // -10dB
@@ -288,7 +267,7 @@
             document.body.classList.toggle('running', state === 'running');
             document.body.classList.toggle('decelerating', state === 'decelerating');
             
-            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
+            // stopMode のロジックを削除
 
             if (state === 'stopped') {
                 startButton.style.display = 'block';
@@ -299,7 +278,7 @@
                 stopButton.style.display = 'block';
                 backToSettingsLink.style.display = 'none';
                 
-                stopButton.disabled = (stopMode === 'timer');
+                stopButton.disabled = false; // 常に手動ボタンを有効に
             } else if (state === 'decelerating') {
                 startButton.style.display = 'none';
                 stopButton.style.display = 'none';
@@ -314,8 +293,8 @@
         function startFastAnimation() {
             animationInterval = setInterval(() => {
                 randomNumberEl.textContent = getRandomNumber(currentMin, currentMax, currentStep);
-                // 明るい音を再生 (周波数をA6に変更)
-                tickSynth.triggerAttackRelease('A6', '0.01');
+                // 明るい音を再生 (周波数を A6 から C6 に変更)
+                tickSynth.triggerAttackRelease('C6', '0.01');
             }, 50); // 間隔を 30ms から 50ms に変更（「ピピピ」感を出すため）
         }
 
@@ -365,7 +344,7 @@
 
             // 高速アニメーションと自動停止タイマーを停止
             clearInterval(animationInterval);
-            clearTimeout(stopTimerTimeout);
+            // clearTimeout(stopTimerTimeout) を削除
             
             updateUIState('decelerating');
 
@@ -399,12 +378,7 @@
                 return;
             }
             
-            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
-            const duration = parseFloat(timerInput.value) * 1000;
-            if (stopMode === 'timer' && (isNaN(duration) || duration <= 0)) {
-                showError('タイマーの時間が無効です。');
-                return;
-            }
+            // stopMode と duration のバリデーションを削除
             
             // 刻み値のバリデーション
             const adjustedMin = Math.ceil(currentMin / currentStep) * currentStep;
@@ -436,13 +410,7 @@
             // 高速アニメーション開始
             startFastAnimation();
 
-            // 停止条件に応じた処理
-            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
-            const duration = parseFloat(timerInput.value) * 1000;
-
-            if (stopMode === 'timer') {
-                stopTimerTimeout = setTimeout(initiateDeceleration, duration);
-            }
+            // 停止条件のロジックを削除
         }
 
 
@@ -464,7 +432,7 @@
             if (isRunning || document.body.classList.contains('decelerating')) {
                 clearInterval(animationInterval);
                 clearTimeout(decelerationTimeout);
-                clearTimeout(stopTimerTimeout);
+                // clearTimeout(stopTimerTimeout) を削除
             }
             // 画面遷移
             document.body.classList.remove('show-main');
@@ -476,24 +444,17 @@
             updateUIState('stopped'); 
         }
 
-        /**
-         * 停止モードの変更処理
-         */
-        function handleStopModeChange() {
-            const stopMode = stopModeTimerRadio.checked ? 'timer' : 'manual';
-            timerInputContainer.style.display = (stopMode === 'timer') ? 'block' : 'none';
-        }
+        // handleStopModeChange 関数を削除
 
         // --- イベントリスナーの設定 ---
-        configCompleteButton.addEventListener('click', handleConfigComplete); // 変更
-        startButton.addEventListener('click', handleMainStart); // 追加
+        configCompleteButton.addEventListener('click', handleConfigComplete); 
+        startButton.addEventListener('click', handleMainStart); 
         stopButton.addEventListener('click', handleStop);
-        backToSettingsLink.addEventListener('click', handleBackToSettings); // 変更
-        stopModeTimerRadio.addEventListener('change', handleStopModeChange);
-        stopModeManualRadio.addEventListener('change', handleStopModeChange);
+        backToSettingsLink.addEventListener('click', handleBackToSettings); 
+        // 停止モード変更のイベントリスナーを削除
 
         // --- 初期化処理 ---
-        handleStopModeChange(); // タイマー入力欄の表示を制御
+        // handleStopModeChange() を削除
         randomNumberEl.textContent = minInput.value; // 初期値を表示
         updateUIState('stopped'); // 初期ボタン状態を設定
 
